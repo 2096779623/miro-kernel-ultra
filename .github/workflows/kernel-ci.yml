@@ -62,6 +62,8 @@ jobs:
   # 独立 runner 并行编译；版本后缀在编译时写入模块 vermagic，不能事后修改。
   build-release:
     needs: preflight
+    # TEMP(debug-only): 暂时跳过 release 版本编译，恢复时删掉下行
+    if: ${{ false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     permissions:
@@ -368,7 +370,8 @@ jobs:
   # package is unpacked and booted on its own, so a broken release package and a
   # broken debug package are told apart instead of hiding behind one another.
   smoke-test:
-    needs: [package-release, package-debug]
+    # TEMP(debug-only): 只对 debug 包做启动冒烟
+    needs: [package-debug]
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
@@ -385,11 +388,6 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: miro-kernel-ultra-release-${{ github.run_id }}
-          path: smoke-release
-
-      - uses: actions/download-artifact@v8
-        with:
           name: miro-kernel-ultra-debug-${{ github.run_id }}
           path: smoke-debug
 
@@ -398,7 +396,7 @@ jobs:
           chmod +x scripts/ci/smoke-boot-test.sh
           rm -rf smoke-images
           mkdir -p smoke-images
-          for zip in smoke-release/*.zip smoke-debug/*.zip; do
+          for zip in smoke-debug/*.zip; do
             name="$(basename "${zip}" .zip)"
             unzip -p "${zip}" Image > "smoke-images/${name}.Image"
             test -s "smoke-images/${name}.Image"

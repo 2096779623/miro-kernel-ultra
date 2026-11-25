@@ -882,6 +882,18 @@ package_anykernel3() {
     local zip_path="${DIST_DIR}/${zip_name}"
     mkdir -p "${DIST_DIR}"
     rm -f "${zip_path}"
+
+    # 32-bit ARM tools cannot execute on 64-bit-only SoCs (e.g. SM8750 / Oryon);
+    # ship aarch64 builds so AnyKernel3 works there.
+    if [ -d "${ROOT_DIR}/tools-arm64" ]; then
+        for tool in busybox magiskboot magiskpolicy; do
+            if [ -f "${ROOT_DIR}/tools-arm64/${tool}" ]; then
+                cp -f "${ROOT_DIR}/tools-arm64/${tool}" "${ANYKERNEL3_DIR}/tools/${tool}"
+                chmod 755 "${ANYKERNEL3_DIR}/tools/${tool}"
+            fi
+        done
+        log "  AK3 tools: replaced with aarch64 builds"
+    fi
     ( cd "${ANYKERNEL3_DIR}" && zip -r9 "${zip_path}" . -x ".git" ".git/*" "README.md" ".gitignore" )
     log "AnyKernel3 zip created: ${zip_path}"
 }

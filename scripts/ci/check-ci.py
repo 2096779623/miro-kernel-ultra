@@ -79,11 +79,11 @@ symbol_downloads = [step['with'] for step in jobs['release']['steps'] if step.ge
 assert {step['name'] for step in symbol_downloads} == {
     f'miro-kernel-ultra-symbols-{variant}-${{{{ github.run_id }}}}' for variant in ('release', 'debug')}
 assert len(symbol_downloads) == 2
-# 临时 debug-only 模式：release 编译被关闭时，冒烟测试只针对 debug 包。
-debug_only = str(jobs['build-release'].get('if', '')).strip() in ('${{ false }}', 'false', 'False')
-if debug_only:
-    assert jobs['smoke-test']['needs'] == ['package-debug']
-    assert any('for zip in smoke-debug/*.zip' in step.get('run', '') for step in jobs['smoke-test']['steps'])
+# 构建变体开关：debug 被显式关闭时只跑 release 链路，冒烟测试只针对 release 包。
+debug_off = str(jobs['build-debug'].get('if', '')).strip() in ('${{ false }}', 'false', 'False')
+if debug_off:
+    assert jobs['smoke-test']['needs'] == ['package-release']
+    assert any('for zip in smoke-release/*.zip' in step.get('run', '') for step in jobs['smoke-test']['steps'])
 else:
     assert jobs['smoke-test']['needs'] == ['package-release', 'package-debug']
     assert any('for zip in smoke-release/*.zip smoke-debug/*.zip' in step.get('run', '') for step in jobs['smoke-test']['steps'])

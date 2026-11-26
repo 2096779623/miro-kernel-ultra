@@ -62,8 +62,6 @@ jobs:
   # 独立 runner 并行编译；版本后缀在编译时写入模块 vermagic，不能事后修改。
   build-release:
     needs: preflight
-    # TEMP(debug-only): 暂时跳过 release 版本编译，恢复时删掉下行
-    if: ${{ false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     permissions:
@@ -97,7 +95,7 @@ jobs:
             build-essential clang lld llvm \
             gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
             flex bison bc cpio zip unzip git ccache \
-            device-tree-compiler kmod dwarves \
+            device-tree-compiler kmod dwarves erofs-utils \
             libelf-dev libssl-dev libncurses-dev zlib1g-dev \
             perl python3 rsync xz-utils zstd
 
@@ -139,12 +137,30 @@ jobs:
           { JOBS="$(nproc)" bash build.sh all && JOBS="$(nproc)" bash build.sh kpatch; } 2>&1 | tee "${OUT_DIR}/ci-build.log"
 
       # 只传递当前 variant 打包所需模块树，保留 build.sh 读取的目录布局。
+      - name: Build vendor_dlkm image (erofs)
+        run: |
+          set -euo pipefail
+          mods_root="${OUT_DIR}/${MODULES_TREE}/lib/modules"
+          rel="$(ls "${mods_root}" | head -1)"
+          stage="$(mktemp -d)"
+          mkdir -p "${stage}/lib/modules/${rel}"
+          find "${mods_root}/${rel}" -name '*.ko' -exec cp -f {} "${stage}/lib/modules/${rel}/" \;
+          depmod -b "${stage}" "${rel}"
+          mv "${stage}/lib/modules/${rel}"/* "${stage}/lib/modules/"
+          rmdir "${stage}/lib/modules/${rel}"
+          ls "${stage}/lib/modules"/*.ko | xargs -n1 basename | sort > "${stage}/lib/modules/modules.load"
+          mkdir -p "${OUT_DIR}/dist"
+          mkfs.erofs -z lz4hc,9 -T 0 "${OUT_DIR}/dist/vendor_dlkm.img" "${stage}"
+          sz=$(stat -c%s "${OUT_DIR}/dist/vendor_dlkm.img")
+          echo "vendor_dlkm.img = ${sz} bytes (partition limit 56307712)"
+          echo "modules = $(ls "${stage}/lib/modules"/*.ko | wc -l)"
+          [ "${sz}" -le 56307712 ] || { echo "ERROR: vendor_dlkm.img exceeds partition size"; exit 1; }
       - name: Stage kernel outputs for packaging
         run: |
           rm -rf ci-kernel
           dest="ci-kernel/${OUT_DIR}"
           mkdir -p "${dest}/dist" "${dest}/arch/arm64/boot" ci-kernel/KPatch-Next/tools
-          for file in Image Image-kpatch-next-exp dtb dtbo.img; do
+          for file in Image Image-kpatch-next-exp dtb dtbo.img vendor_dlkm.img; do
             if [ -f "${OUT_DIR}/dist/${file}" ]; then
               cp -f "${OUT_DIR}/dist/${file}" "${dest}/dist/"
             fi
@@ -225,6 +241,8 @@ jobs:
 
   build-debug:
     needs: preflight
+    # TEMP: B 方案只构建 release 版本；debug 暂时关闭
+    if: ${{ false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     permissions:
@@ -300,6 +318,10 @@ jobs:
             cp -f ci-kernel/out/dist/Image-kpatch-next-exp ci-release/
             kpatch_files+=(Image-kpatch-next-exp)
           fi
+          if [ -f ci-kernel/out/dist/vendor_dlkm.img ]; then
+            cp -f ci-kernel/out/dist/vendor_dlkm.img ci-release/
+            standard_files+=(vendor_dlkm.img)
+          fi
           ( cd ci-release && sha256sum "${standard_files[@]}" > SHA256SUMS-standard )
           ( cd ci-release && sha256sum "${kpatch_files[@]}" > SHA256SUMS-kpatch-exp )
 
@@ -370,8 +392,8 @@ jobs:
   # package is unpacked and booted on its own, so a broken release package and a
   # broken debug package are told apart instead of hiding behind one another.
   smoke-test:
-    # TEMP(debug-only): 只对 debug 包做启动冒烟
-    needs: [package-debug]
+    # TEMP: B 方案只构建 release，冒烟测试只针对 release 包
+    needs: [package-release]
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
@@ -388,15 +410,15 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: miro-kernel-ultra-debug-${{ github.run_id }}
-          path: smoke-debug
+          name: miro-kernel-ultra-release-${{ github.run_id }}
+          path: smoke-release
 
       - name: Boot the Image inside every published package
         run: |
           chmod +x scripts/ci/smoke-boot-test.sh
           rm -rf smoke-images
           mkdir -p smoke-images
-          for zip in smoke-debug/*.zip; do
+          for zip in smoke-release/*.zip; do
             name="$(basename "${zip}" .zip)"
             unzip -p "${zip}" Image > "smoke-images/${name}.Image"
             test -s "smoke-images/${name}.Image"

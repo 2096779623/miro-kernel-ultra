@@ -182,6 +182,8 @@ jobs:
             out/.config
           if-no-files-found: warn
           retention-days: 14
+          include-hidden-files: true
+
       - name: Upload kernel outputs
 
         uses: actions/upload-artifact@v7

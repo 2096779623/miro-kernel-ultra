@@ -52,7 +52,11 @@ for variant, out_dir, suffix, modules, archive in (
     assert build['timeout-minutes'] == 240
     assert build['env']['BUILD_VARIANT'] == variant
     assert build['env']['OUT_DIR'] == out_dir
-    assert build['env']['LOCALVERSION'] == suffix
+    expected_localversion = suffix
+    if variant == 'release':
+        # A 方案：release 伪装成原厂 version string，才能加载原厂 vendor 模块
+        expected_localversion = '-android15-8-geae86f166c48-abogki367569362-4k'
+    assert build['env']['LOCALVERSION'] == expected_localversion
     assert build['env']['MODULES_TREE'] == modules
     assert build['env']['KPATCH_TOOLCHAIN_DIR'] == 'out/kpatch-toolchain'
     assert build['env']['DEBUG_SYMBOLS_ARCHIVE'] == '${{ needs.preflight.outputs.' + archive + ' }}'

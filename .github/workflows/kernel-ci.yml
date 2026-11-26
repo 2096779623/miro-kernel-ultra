@@ -177,7 +177,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: tcp_bbr-${{ env.BUILD_VARIANT }}-${{ github.run_id }}
-          path: out/**/tcp_bbr.ko
+          path: |
+            out/**/tcp_bbr.ko
+            out/.config
           if-no-files-found: warn
           retention-days: 14
       - name: Upload kernel outputs

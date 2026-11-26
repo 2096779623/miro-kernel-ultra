@@ -173,7 +173,15 @@ jobs:
           cp -r "${OUT_DIR}/${MODULES_TREE}" "${dest}/${MODULES_TREE}"
           cp -f KPatch-Next/tools/kptools ci-kernel/KPatch-Next/tools/
 
+      - name: Upload tcp_bbr module
+        uses: actions/upload-artifact@v7
+        with:
+          name: tcp_bbr-${{ github.run_id }}
+          path: out/**/tcp_bbr.ko
+          if-no-files-found: warn
+          retention-days: 14
       - name: Upload kernel outputs
+
         uses: actions/upload-artifact@v7
         with:
           name: miro-kernel-ultra-kernel-${{ env.BUILD_VARIANT }}-${{ github.run_id }}

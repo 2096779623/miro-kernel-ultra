@@ -885,14 +885,23 @@ package_anykernel3() {
 
     # 32-bit ARM tools cannot execute on 64-bit-only SoCs (e.g. SM8750 / Oryon);
     # ship aarch64 builds so AnyKernel3 works there.
-    if [ -d "${ROOT_DIR}/tools-arm64" ]; then
+    if [ -d "${SCRIPT_DIR}/tools-arm64" ]; then
         for tool in busybox magiskboot magiskpolicy; do
-            if [ -f "${ROOT_DIR}/tools-arm64/${tool}" ]; then
-                cp -f "${ROOT_DIR}/tools-arm64/${tool}" "${ANYKERNEL3_DIR}/tools/${tool}"
+            if [ -f "${SCRIPT_DIR}/tools-arm64/${tool}" ]; then
+                cp -f "${SCRIPT_DIR}/tools-arm64/${tool}" "${ANYKERNEL3_DIR}/tools/${tool}"
                 chmod 755 "${ANYKERNEL3_DIR}/tools/${tool}"
             fi
         done
-        log "  AK3 tools: replaced with aarch64 builds"
+        if command -v readelf >/dev/null 2>&1 && [ -f "${ANYKERNEL3_DIR}/tools/busybox" ]; then
+            case "$(readelf -h "${ANYKERNEL3_DIR}/tools/busybox" 2>/dev/null | grep -m1 Class)" in
+                *ELF64*) log "  AK3 tools: replaced with aarch64 builds (ELF64 verified)" ;;
+                *) error "AK3 busybox is not 64-bit; 64-bit-only devices cannot flash this zip" ;;
+            esac
+        else
+            log "  AK3 tools: replaced with aarch64 builds"
+        fi
+    else
+        error "tools-arm64/ missing; refusing to build a zip that cannot flash on this SoC"
     fi
     ( cd "${ANYKERNEL3_DIR}" && zip -r9 "${zip_path}" . -x ".git" ".git/*" "README.md" ".gitignore" )
     log "AnyKernel3 zip created: ${zip_path}"

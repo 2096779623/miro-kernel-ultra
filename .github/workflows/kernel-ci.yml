@@ -73,7 +73,7 @@ jobs:
       KBUILD_BUILD_HOST: github
       BUILD_VARIANT: release
       OUT_DIR: out
-      LOCALVERSION: ""
+      LOCALVERSION: "-android15-8-geae86f166c48-abogki367569362-4k"
       MODULES_TREE: modules_install_release
       KPATCH_TOOLCHAIN_DIR: out/kpatch-toolchain
       DEBUG_SYMBOLS_ARCHIVE: ${{ needs.preflight.outputs.symbols_archive }}

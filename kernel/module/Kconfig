@@ -188,7 +188,6 @@ config MODULE_SRCVERSION_ALL
 
 config MODULE_SCMVERSION
 	bool "SCM version for modules"
-	depends on LOCALVERSION_AUTO
 	help
 	  This enables the module attribute "scmversion" which can be used
 	  by developers to identify the SCM version of a given module, e.g.
